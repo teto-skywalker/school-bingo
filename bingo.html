@@ -229,8 +229,6 @@
     to{ transform:translateY(120vh) rotate(360deg); }
   }
 
-  #camera-input{ display:none; }
-
   /* ---------- Phase3: アップロード確認ダイアログ ---------- */
   #upload-overlay{
     position:fixed; inset:0;
@@ -392,6 +390,53 @@
     display:flex; align-items:center; justify-content:center;
     cursor:pointer;
   }
+
+  /* ---------- アプリ内カメラ撮影画面 ---------- */
+  #camera-view-overlay{
+    position:fixed; inset:0;
+    background:#000;
+    z-index:90;
+    opacity:0; visibility:hidden;
+    transition:opacity .25s ease;
+  }
+  #camera-view-overlay.show{ opacity:1; visibility:visible; }
+  #camera-video{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    background:#000;
+  }
+  .camera-caption{
+    position:absolute; top:4vh; left:0; right:0;
+    text-align:center;
+    color:#fff;
+    font-size:4vw;
+    font-weight:bold;
+    text-shadow:0 2px 6px rgba(0,0,0,.6);
+  }
+  #camera-cancel{
+    position:absolute; top:4vh; right:4vw;
+    width:12vw; height:12vw; max-width:60px; max-height:60px;
+    border-radius:50%;
+    background:#ff5d8f;
+    color:#fff;
+    border:none;
+    font-size:6vw;
+    line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  #camera-shutter{
+    position:absolute; bottom:6vh; left:50%;
+    transform:translateX(-50%);
+    width:18vw; height:18vw; max-width:84px; max-height:84px;
+    border-radius:50%;
+    background:#fff;
+    border:6px solid #ffb64f;
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  #camera-shutter:active{ background:#ffe0ec; }
 </style>
 </head>
 <body>
@@ -475,7 +520,15 @@
     </div>
   </div>
 
-  <input id="camera-input" type="file" accept="image/*" capture="environment">
+  <!-- アプリ内カメラ撮影画面 -->
+  <div id="camera-view-overlay">
+    <video id="camera-video" autoplay playsinline muted></video>
+    <div class="camera-caption" id="camera-caption"></div>
+    <button id="camera-cancel" type="button">✕</button>
+    <button id="camera-shutter" type="button" aria-label="しゃしんをとる"></button>
+  </div>
+  <canvas id="camera-canvas" style="display:none;"></canvas>
+
   <input id="upload-file-input" type="file" accept="image/*">
 </div>
 
@@ -608,7 +661,12 @@
   var titleScreen = document.getElementById("title-screen");
   var bingoScreen = document.getElementById("bingo-screen");
   var grid = document.getElementById("grid");
-  var cameraInput = document.getElementById("camera-input");
+  var cameraViewOverlay = document.getElementById("camera-view-overlay");
+  var cameraVideo = document.getElementById("camera-video");
+  var cameraCanvas = document.getElementById("camera-canvas");
+  var cameraCaption = document.getElementById("camera-caption");
+  var cameraShutterButton = document.getElementById("camera-shutter");
+  var cameraCancelButton = document.getElementById("camera-cancel");
   var photoModal = document.getElementById("photo-modal");
   var modalImage = document.getElementById("modal-image");
   var modalCaption = document.getElementById("modal-caption");
@@ -708,12 +766,12 @@
 
   choiceCameraButton.addEventListener("click", function(){
     closeCaptureChoice();
-    openFilePicker(cameraInput, true);
+    openCameraCapture();
   });
 
   choiceUploadButton.addEventListener("click", function(){
     closeCaptureChoice();
-    openFilePicker(uploadFileInput, false);
+    openFilePicker();
   });
 
   choiceCancelButton.addEventListener("click", function(){
@@ -723,13 +781,70 @@
     revertFlip(index);
   });
 
-  // ---------- ファイル選択（カメラ起動／ファイルからえらぶ 共通） ----------
-  var pendingNeedsConfirm = false;
+  // ---------- アプリ内カメラ撮影（getUserMedia） ----------
+  // capture="environment" のinputはChromebook/PCのChromeでは無視され
+  // 通常のファイル選択画面になってしまうため、getUserMediaでライブ映像を表示する方式にしている
+  var cameraStream = null;
 
-  function openFilePicker(inputEl, needsConfirm){
-    pendingNeedsConfirm = needsConfirm;
-    inputEl.value = "";
-    inputEl.click();
+  function openCameraCapture(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn("このブラウザはカメラ機能(getUserMedia)に対応していません");
+      var index = pendingIndex;
+      pendingIndex = null;
+      revertFlip(index);
+      return;
+    }
+
+    cameraCaption.textContent = THEMES[pendingIndex].label + " の しゃしんをとろう";
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    }).then(function(stream){
+      cameraStream = stream;
+      cameraVideo.srcObject = stream;
+      cameraViewOverlay.classList.add("show");
+    }).catch(function(err){
+      console.warn("カメラを起動できませんでした", err);
+      var index = pendingIndex;
+      pendingIndex = null;
+      revertFlip(index);
+    });
+  }
+
+  function stopCameraStream(){
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function(track){ track.stop(); });
+      cameraStream = null;
+    }
+    cameraVideo.srcObject = null;
+  }
+
+  function closeCameraCapture(){
+    stopCameraStream();
+    cameraViewOverlay.classList.remove("show");
+  }
+
+  cameraShutterButton.addEventListener("click", function(){
+    cameraCanvas.width = cameraVideo.videoWidth;
+    cameraCanvas.height = cameraVideo.videoHeight;
+    cameraCanvas.getContext("2d").drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+    var dataUrl = cameraCanvas.toDataURL("image/jpeg", 0.9);
+    closeCameraCapture();
+    showCaptureConfirm(dataUrl);
+  });
+
+  cameraCancelButton.addEventListener("click", function(){
+    closeCameraCapture();
+    var index = pendingIndex;
+    pendingIndex = null;
+    revertFlip(index);
+  });
+
+  // ---------- ファイル選択（ファイルからえらぶ） ----------
+  function openFilePicker(){
+    uploadFileInput.value = "";
+    uploadFileInput.click();
 
     // キャンセル時（changeイベントが発火しない端末）を考慮して
     // window復帰後に選択有無を確認し、未選択ならパネルを戻す
@@ -737,9 +852,8 @@
     window.addEventListener("focus", function onFocus(){
       window.removeEventListener("focus", onFocus);
       setTimeout(function(){
-        var noFileChosen = !inputEl.files || inputEl.files.length === 0;
-        var confirmShowing = captureConfirmOverlay.classList.contains("show");
-        if (noFileChosen && pendingIndex === checkIndex && !confirmShowing) {
+        var noFileChosen = !uploadFileInput.files || uploadFileInput.files.length === 0;
+        if (noFileChosen && pendingIndex === checkIndex) {
           pendingIndex = null;
           revertFlip(checkIndex);
         }
@@ -747,26 +861,18 @@
     });
   }
 
-  function handleFileSelected(inputEl){
+  uploadFileInput.addEventListener("change", function(){
     if (pendingIndex === null) return;
-    var file = inputEl.files && inputEl.files[0];
+    var file = uploadFileInput.files && uploadFileInput.files[0];
     if (!file) return;
 
     var index = pendingIndex;
     var reader = new FileReader();
     reader.onload = function(e){
-      var dataUrl = e.target.result;
-      if (pendingNeedsConfirm) {
-        showCaptureConfirm(dataUrl);
-      } else {
-        finalizeShot(index, dataUrl);
-      }
+      finalizeShot(index, e.target.result);
     };
     reader.readAsDataURL(file);
-  }
-
-  cameraInput.addEventListener("change", function(){ handleFileSelected(cameraInput); });
-  uploadFileInput.addEventListener("change", function(){ handleFileSelected(uploadFileInput); });
+  });
 
   // ---------- 撮影した写真の確認（カメラでとった場合のみ） ----------
   var pendingDataUrl = null;
@@ -791,7 +897,7 @@
 
   confirmRetakeButton.addEventListener("click", function(){
     hideCaptureConfirm();
-    openFilePicker(cameraInput, true);
+    openCameraCapture();
   });
 
   confirmCancelButton.addEventListener("click", function(){
