@@ -290,6 +290,108 @@
     animation:spin .9s linear infinite;
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  #upload-file-input{ display:none; }
+
+  /* ---------- しゃしんの取得方法選択・確認 ---------- */
+  #capture-choice-overlay,
+  #capture-confirm-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:80;
+    opacity:0; visibility:hidden;
+    transition:opacity .25s ease;
+    padding:4vw;
+  }
+  #capture-choice-overlay.show,
+  #capture-confirm-overlay.show{ opacity:1; visibility:visible; }
+  .choice-box, .confirm-box{
+    position:relative;
+    background:#fff;
+    border-radius:28px;
+    padding:5vh 6vw;
+    text-align:center;
+    max-width:90vw;
+    box-shadow:0 12px 40px rgba(0,0,0,.3);
+  }
+  .choice-message, .confirm-message{
+    font-size:4vw;
+    font-weight:bold;
+    color:var(--ink);
+    margin:0 0 3vh 0;
+  }
+  .choice-buttons{
+    display:flex; gap:4vw; justify-content:center; margin-bottom:3vh;
+  }
+  .choice-btn{
+    font-size:3vw;
+    line-height:1.6;
+    font-weight:bold;
+    padding:3vh 4vw;
+    border:none;
+    border-radius:24px;
+    background:linear-gradient(145deg,#7dd3fc,#38bdf8);
+    color:#fff;
+    box-shadow:0 6px 0 #2591c9;
+    cursor:pointer;
+    touch-action:manipulation;
+    min-width:30vw;
+  }
+  .choice-btn:active{ transform:translateY(4px); }
+  .choice-cancel-btn{
+    font-size:2.6vw;
+    padding:1.2vh 4vw;
+    border:3px solid #ccc;
+    border-radius:100px;
+    background:#fff;
+    color:#999;
+    font-weight:bold;
+    cursor:pointer;
+  }
+  .confirm-box img{
+    display:block;
+    max-width:80vw;
+    max-height:50vh;
+    border-radius:16px;
+    margin:0 auto 3vh auto;
+    box-shadow:0 6px 20px rgba(0,0,0,.2);
+  }
+  .confirm-buttons{
+    display:flex; gap:4vw; justify-content:center;
+  }
+  .confirm-btn{
+    font-size:3.4vw;
+    font-weight:bold;
+    padding:2.2vh 5vw;
+    border:none;
+    border-radius:100px;
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  .confirm-btn.yes{
+    background:linear-gradient(145deg,#8ee686,#5fc85a);
+    color:#fff;
+    box-shadow:0 6px 0 #3f9c3c;
+  }
+  .confirm-btn.no{
+    background:#fff;
+    color:#3a8bd8;
+    border:3px solid #3a8bd8;
+  }
+  .confirm-btn:active{ transform:translateY(4px); }
+  #confirm-cancel{
+    position:absolute; top:1.5vh; right:1.5vh;
+    width:8vw; height:8vw; max-width:44px; max-height:44px;
+    border-radius:50%;
+    background:#ff5d8f;
+    color:#fff;
+    border:none;
+    font-size:4vw;
+    line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -348,7 +450,33 @@
     </div>
   </div>
 
+  <!-- しゃしんの取得方法選択 -->
+  <div id="capture-choice-overlay">
+    <div class="choice-box">
+      <p class="choice-message" id="choice-theme-label"></p>
+      <div class="choice-buttons">
+        <button id="choice-camera" class="choice-btn" type="button">📷<br>カメラでとる</button>
+        <button id="choice-upload" class="choice-btn" type="button">🖼️<br>ファイルからえらぶ</button>
+      </div>
+      <button id="choice-cancel" class="choice-cancel-btn" type="button">やめる</button>
+    </div>
+  </div>
+
+  <!-- 撮影した写真の確認 -->
+  <div id="capture-confirm-overlay">
+    <div class="confirm-box">
+      <button id="confirm-cancel" type="button">✕</button>
+      <p class="confirm-message">このしゃしんでいい？</p>
+      <img id="confirm-preview-image" src="" alt="かくにん">
+      <div class="confirm-buttons">
+        <button id="confirm-use" class="confirm-btn yes" type="button">これにする</button>
+        <button id="confirm-retake" class="confirm-btn no" type="button">とりなおす</button>
+      </div>
+    </div>
+  </div>
+
   <input id="camera-input" type="file" accept="image/*" capture="environment">
+  <input id="upload-file-input" type="file" accept="image/*">
 </div>
 
 <script>
@@ -490,6 +618,17 @@
   var uploadNoButton = document.getElementById("upload-no");
   var uploadCloseButton = document.getElementById("upload-close");
   var uploadProgressText = document.getElementById("upload-progress-text");
+  var uploadFileInput = document.getElementById("upload-file-input");
+  var captureChoiceOverlay = document.getElementById("capture-choice-overlay");
+  var choiceThemeLabel = document.getElementById("choice-theme-label");
+  var choiceCameraButton = document.getElementById("choice-camera");
+  var choiceUploadButton = document.getElementById("choice-upload");
+  var choiceCancelButton = document.getElementById("choice-cancel");
+  var captureConfirmOverlay = document.getElementById("capture-confirm-overlay");
+  var confirmPreviewImage = document.getElementById("confirm-preview-image");
+  var confirmUseButton = document.getElementById("confirm-use");
+  var confirmRetakeButton = document.getElementById("confirm-retake");
+  var confirmCancelButton = document.getElementById("confirm-cancel");
 
   function buildGrid(){
     grid.innerHTML = "";
@@ -509,7 +648,7 @@
 
       var back = document.createElement("div");
       back.className = "cell-face cell-back";
-      back.innerHTML = "📷<br>カメラをおこすよ";
+      back.innerHTML = "📷<br>とりかたをえらぶよ";
 
       inner.appendChild(front);
       inner.appendChild(back);
@@ -546,27 +685,9 @@
       if (e.propertyName !== "transform" || handled) return;
       handled = true;
       parts.inner.removeEventListener("transitionend", onFlipEnd);
-      openCamera(index);
+      openCaptureChoice(index);
     }
     parts.inner.addEventListener("transitionend", onFlipEnd);
-  }
-
-  function openCamera(index){
-    pendingIndex = index;
-    cameraInput.value = "";
-    cameraInput.click();
-
-    // キャンセル時（changeイベントが発火しない端末）を考慮して
-    // window復帰後に選択有無を確認し、未選択ならパネルを戻す
-    var checkIndex = index;
-    window.addEventListener("focus", function onFocus(){
-      window.removeEventListener("focus", onFocus);
-      setTimeout(function(){
-        if (!cameraInput.files || cameraInput.files.length === 0) {
-          revertFlip(checkIndex);
-        }
-      }, 400);
-    });
   }
 
   function revertFlip(index){
@@ -574,37 +695,129 @@
     parts.inner.classList.remove("flipped");
   }
 
-  cameraInput.addEventListener("change", function(){
-    if (pendingIndex === null) return;
-    var file = cameraInput.files && cameraInput.files[0];
+  // ---------- しゃしんの取得方法選択 ----------
+  function openCaptureChoice(index){
+    pendingIndex = index;
+    choiceThemeLabel.textContent = THEMES[index].label + " の しゃしんをとろう";
+    captureChoiceOverlay.classList.add("show");
+  }
+
+  function closeCaptureChoice(){
+    captureChoiceOverlay.classList.remove("show");
+  }
+
+  choiceCameraButton.addEventListener("click", function(){
+    closeCaptureChoice();
+    openFilePicker(cameraInput, true);
+  });
+
+  choiceUploadButton.addEventListener("click", function(){
+    closeCaptureChoice();
+    openFilePicker(uploadFileInput, false);
+  });
+
+  choiceCancelButton.addEventListener("click", function(){
     var index = pendingIndex;
+    closeCaptureChoice();
     pendingIndex = null;
+    revertFlip(index);
+  });
 
-    if (!file) {
-      revertFlip(index);
-      return;
-    }
+  // ---------- ファイル選択（カメラ起動／ファイルからえらぶ 共通） ----------
+  var pendingNeedsConfirm = false;
 
+  function openFilePicker(inputEl, needsConfirm){
+    pendingNeedsConfirm = needsConfirm;
+    inputEl.value = "";
+    inputEl.click();
+
+    // キャンセル時（changeイベントが発火しない端末）を考慮して
+    // window復帰後に選択有無を確認し、未選択ならパネルを戻す
+    var checkIndex = pendingIndex;
+    window.addEventListener("focus", function onFocus(){
+      window.removeEventListener("focus", onFocus);
+      setTimeout(function(){
+        var noFileChosen = !inputEl.files || inputEl.files.length === 0;
+        var confirmShowing = captureConfirmOverlay.classList.contains("show");
+        if (noFileChosen && pendingIndex === checkIndex && !confirmShowing) {
+          pendingIndex = null;
+          revertFlip(checkIndex);
+        }
+      }, 400);
+    });
+  }
+
+  function handleFileSelected(inputEl){
+    if (pendingIndex === null) return;
+    var file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+
+    var index = pendingIndex;
     var reader = new FileReader();
     reader.onload = function(e){
       var dataUrl = e.target.result;
-      photos[index] = dataUrl;
-      fillCell(index, dataUrl);
-      revertFlip(index);
-      checkBingo();
-
-      saveShot({
-        sessionId: sessionId,
-        theme: THEMES[index].label,
-        imageDataUrl: dataUrl,
-        capturedAt: new Date().toISOString(),
-        uploaded: false
-      }).catch(function(err){
-        console.warn("IndexedDBへの保存に失敗しました", err);
-      });
+      if (pendingNeedsConfirm) {
+        showCaptureConfirm(dataUrl);
+      } else {
+        finalizeShot(index, dataUrl);
+      }
     };
     reader.readAsDataURL(file);
+  }
+
+  cameraInput.addEventListener("change", function(){ handleFileSelected(cameraInput); });
+  uploadFileInput.addEventListener("change", function(){ handleFileSelected(uploadFileInput); });
+
+  // ---------- 撮影した写真の確認（カメラでとった場合のみ） ----------
+  var pendingDataUrl = null;
+
+  function showCaptureConfirm(dataUrl){
+    pendingDataUrl = dataUrl;
+    confirmPreviewImage.src = dataUrl;
+    captureConfirmOverlay.classList.add("show");
+  }
+
+  function hideCaptureConfirm(){
+    captureConfirmOverlay.classList.remove("show");
+    pendingDataUrl = null;
+  }
+
+  confirmUseButton.addEventListener("click", function(){
+    var index = pendingIndex;
+    var dataUrl = pendingDataUrl;
+    hideCaptureConfirm();
+    finalizeShot(index, dataUrl);
   });
+
+  confirmRetakeButton.addEventListener("click", function(){
+    hideCaptureConfirm();
+    openFilePicker(cameraInput, true);
+  });
+
+  confirmCancelButton.addEventListener("click", function(){
+    var index = pendingIndex;
+    hideCaptureConfirm();
+    pendingIndex = null;
+    revertFlip(index);
+  });
+
+  function finalizeShot(index, dataUrl){
+    photos[index] = dataUrl;
+    fillCell(index, dataUrl);
+    revertFlip(index);
+    pendingIndex = null;
+    checkBingo();
+
+    saveShot({
+      sessionId: sessionId,
+      theme: THEMES[index].label,
+      imageDataUrl: dataUrl,
+      capturedAt: new Date().toISOString(),
+      uploaded: false
+    }).catch(function(err){
+      console.warn("IndexedDBへの保存に失敗しました", err);
+    });
+  }
 
   function fillCell(index, dataUrl){
     var parts = getCellParts(index);
