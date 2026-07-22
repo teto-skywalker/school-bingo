@@ -1,7 +1,7 @@
 "use strict";
 
 // bingo.html のみをキャッシュ対象とする（撮影画像はIndexedDB側で管理するためキャッシュ不要）
-var CACHE_NAME = "bingo-cache-v1";
+var CACHE_NAME = "bingo-cache-v2";
 var CACHE_URL = "./bingo.html";
 
 self.addEventListener("install", function(event){
