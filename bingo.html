@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>がっこうのまわりにあるものをみつけてびんごをめざそう</title>
+<style>
+  :root{
+    --pink:#ff8fab;
+    --yellow:#ffd166;
+    --blue:#6ec6ff;
+    --green:#8ee686;
+    --purple:#c8a2ff;
+    --ink:#3a3a3a;
+    --card:#ffffff;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    font-family:"Hiragino Maru Gothic ProN","UD Digi Kyokasho N-R","游ゴシック体","Yu Gothic",Meiryo,sans-serif;
+    color:var(--ink);
+    overflow:hidden;
+    background:linear-gradient(160deg,#fff6e5,#e5f7ff);
+    touch-action:manipulation;
+    user-select:none;
+  }
+  #app{ position:relative; width:100vw; height:100vh; }
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:3vh 3vw;
+    opacity:1; visibility:visible;
+    transition:opacity .35s ease;
+  }
+  .screen.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
+
+  /* ---------- タイトル画面 ---------- */
+  #title-screen{
+    background:radial-gradient(circle at 30% 20%, #fff9e6, #ffe0ec 60%, #d9f2ff);
+    text-align:center;
+  }
+  .title-illust{
+    font-size:14vh;
+    line-height:1;
+    margin-bottom:1vh;
+  }
+  h1.app-title{
+    font-size:6.2vw;
+    line-height:1.4;
+    margin:0 0 4vh 0;
+    color:#ff5d8f;
+    text-shadow:2px 2px 0 #fff, 4px 4px 0 rgba(0,0,0,.08);
+    max-width:90vw;
+  }
+  .big-button{
+    font-size:5vw;
+    font-weight:bold;
+    padding:3vh 8vw;
+    border:none;
+    border-radius:100px;
+    background:linear-gradient(145deg,#ffb64f,#ff8f4d);
+    color:#fff;
+    box-shadow:0 8px 0 #d9762a, 0 12px 20px rgba(0,0,0,.15);
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  .big-button:active{
+    transform:translateY(6px);
+    box-shadow:0 2px 0 #d9762a, 0 4px 10px rgba(0,0,0,.15);
+  }
+
+  /* ---------- ビンゴ画面 ---------- */
+  #bingo-screen{ background:linear-gradient(160deg,#e9fff0,#e6f4ff); justify-content:flex-start; padding-top:2vh; }
+  .bingo-heading{
+    font-size:3.4vw;
+    margin:0 0 2vh 0;
+    color:#3a8bd8;
+    text-align:center;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    grid-template-rows:repeat(3, 1fr);
+    gap:2vw;
+    width:min(90vw, 80vh);
+    height:min(90vw, 80vh);
+    perspective:1200px;
+  }
+  .cell{
+    position:relative;
+    width:100%; height:100%;
+  }
+  .cell-inner{
+    position:relative;
+    width:100%; height:100%;
+    transform-style:preserve-3d;
+    transition:transform .5s cubic-bezier(.68,-0.4,.32,1.4);
+    border-radius:20px;
+  }
+  .cell-inner.flipped{ transform:rotateY(180deg); }
+  .cell-face{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius:20px;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    box-shadow:0 6px 0 rgba(0,0,0,.12), 0 8px 14px rgba(0,0,0,.08);
+    overflow:hidden;
+    padding:2%;
+  }
+  .cell-front{
+    background:var(--card);
+    border:4px solid var(--yellow);
+  }
+  .cell-front.filled{
+    border-color:var(--green);
+    padding:0;
+  }
+  .cell-back{
+    background:linear-gradient(145deg,#7dd3fc,#38bdf8);
+    color:#fff;
+    transform:rotateY(180deg);
+    font-size:5vw;
+    text-align:center;
+  }
+  .cell-emoji{ font-size:6vw; line-height:1; }
+  .cell-label{ font-size:2.6vw; font-weight:bold; margin-top:1vh; text-align:center; }
+  .cell-thumb-wrap{
+    position:relative; width:100%; height:100%;
+  }
+  .cell-thumb-wrap img{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+  .cell-thumb-label{
+    position:absolute; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,.55);
+    color:#fff;
+    font-size:2.4vw;
+    font-weight:bold;
+    text-align:center;
+    padding:0.8vh 0;
+  }
+  .cell-check{
+    position:absolute; top:4%; right:4%;
+    font-size:3.2vw;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.4));
+  }
+
+  .bottom-bar{
+    margin-top:2.5vh;
+    display:flex; gap:2vw;
+  }
+  .small-button{
+    font-size:2.4vw;
+    padding:1.4vh 4vw;
+    border:none;
+    border-radius:100px;
+    background:#fff;
+    color:#3a8bd8;
+    border:3px solid #3a8bd8;
+    font-weight:bold;
+    cursor:pointer;
+  }
+
+  /* ---------- 原寸表示モーダル ---------- */
+  #photo-modal{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.85);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50;
+    opacity:0; visibility:hidden;
+    transition:opacity .25s ease;
+  }
+  #photo-modal.show{ opacity:1; visibility:visible; }
+  #photo-modal img{
+    max-width:90vw; max-height:80vh;
+    border-radius:16px;
+    box-shadow:0 10px 40px rgba(0,0,0,.5);
+  }
+  #photo-modal .modal-caption{
+    position:absolute; top:6vh; left:0; right:0;
+    text-align:center; color:#fff; font-size:4vw; font-weight:bold;
+  }
+  #modal-close{
+    position:absolute; top:4vh; right:4vw;
+    width:12vw; height:12vw; max-width:60px; max-height:60px;
+    border-radius:50%;
+    background:#ff5d8f;
+    color:#fff;
+    border:none;
+    font-size:6vw;
+    line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+
+  /* ---------- お祝い演出 ---------- */
+  #celebration{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    z-index:60;
+    background:rgba(255,255,255,.35);
+    opacity:0; visibility:hidden;
+    transition:opacity .3s ease;
+    overflow:hidden;
+  }
+  #celebration.show{ opacity:1; visibility:visible; }
+  .celebration-box{
+    background:#fff;
+    border-radius:30px;
+    padding:5vh 6vw;
+    text-align:center;
+    box-shadow:0 12px 40px rgba(0,0,0,.25);
+    z-index:2;
+  }
+  .celebration-box h2{
+    font-size:6vw;
+    color:#ff5d8f;
+    margin:0 0 3vh 0;
+  }
+  .confetti{
+    position:absolute;
+    top:-10vh;
+    width:1.6vw; height:3vh;
+    opacity:.9;
+    animation:fall linear forwards;
+  }
+  @keyframes fall{
+    to{ transform:translateY(120vh) rotate(360deg); }
+  }
+
+  #camera-input{ display:none; }
+
+  /* ---------- Phase3: アップロード確認ダイアログ ---------- */
+  #upload-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:70;
+    opacity:0; visibility:hidden;
+    transition:opacity .25s ease;
+    padding:4vw;
+  }
+  #upload-overlay.show{ opacity:1; visibility:visible; }
+  .upload-box{
+    background:#fff;
+    border-radius:28px;
+    padding:5vh 6vw;
+    text-align:center;
+    max-width:90vw;
+    box-shadow:0 12px 40px rgba(0,0,0,.3);
+  }
+  .upload-view.hidden{ display:none; }
+  .upload-message{
+    font-size:4vw;
+    font-weight:bold;
+    color:var(--ink);
+    margin:0 0 3vh 0;
+  }
+  .upload-buttons{
+    display:flex; gap:4vw; justify-content:center;
+  }
+  .upload-btn{
+    font-size:3.6vw;
+    font-weight:bold;
+    padding:2.2vh 6vw;
+    border:none;
+    border-radius:100px;
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  .upload-btn.yes{
+    background:linear-gradient(145deg,#8ee686,#5fc85a);
+    color:#fff;
+    box-shadow:0 6px 0 #3f9c3c;
+  }
+  .upload-btn.no{
+    background:#fff;
+    color:#3a8bd8;
+    border:3px solid #3a8bd8;
+  }
+  .upload-btn:active{ transform:translateY(4px); }
+  .upload-btn:disabled{ opacity:.5; cursor:default; transform:none; }
+  .upload-spinner{
+    width:10vw; height:10vw; max-width:60px; max-height:60px;
+    margin:0 auto 3vh auto;
+    border:6px solid #d9f2ff;
+    border-top-color:#3a8bd8;
+    border-radius:50%;
+    animation:spin .9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- タイトル画面 -->
+  <section id="title-screen" class="screen">
+    <div class="title-illust">🏫🔍📷</div>
+    <h1 class="app-title">がっこうのまわりにある<br>ものをみつけて<br>びんごをめざそう</h1>
+    <button id="start-button" class="big-button" type="button">はじめる</button>
+  </section>
+
+  <!-- ビンゴ画面 -->
+  <section id="bingo-screen" class="screen hidden">
+    <h2 class="bingo-heading">マスをタッチしてしゃしんをとろう！</h2>
+    <div id="grid" class="grid"></div>
+    <div class="bottom-bar">
+      <button id="back-title-button" class="small-button" type="button">タイトルへ</button>
+      <button id="reset-button" class="small-button" type="button">もういちどあそぶ</button>
+    </div>
+  </section>
+
+  <!-- 原寸表示モーダル -->
+  <div id="photo-modal">
+    <div class="modal-caption" id="modal-caption"></div>
+    <button id="modal-close" type="button">✕</button>
+    <img id="modal-image" src="" alt="とったしゃしん">
+  </div>
+
+  <!-- お祝い演出 -->
+  <div id="celebration">
+    <div class="celebration-box">
+      <h2>やったね！びんご！🎉</h2>
+      <button id="celebration-reset" class="big-button" type="button">もういちどあそぶ</button>
+    </div>
+  </div>
+
+  <!-- Phase3: アップロード確認・進捗ダイアログ -->
+  <div id="upload-overlay">
+    <div class="upload-box">
+      <div id="upload-view-confirm" class="upload-view">
+        <p class="upload-message">しゃしんをおくりますか？</p>
+        <div class="upload-buttons">
+          <button id="upload-yes" class="upload-btn yes" type="button">はい</button>
+          <button id="upload-no" class="upload-btn no" type="button">いいえ</button>
+        </div>
+      </div>
+      <div id="upload-view-sending" class="upload-view hidden">
+        <div class="upload-spinner"></div>
+        <p class="upload-message" id="upload-progress-text">おくっているよ…</p>
+      </div>
+      <div id="upload-view-done" class="upload-view hidden">
+        <p class="upload-message">おくりおわったよ！</p>
+        <button id="upload-close" class="upload-btn yes" type="button">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="camera-input" type="file" accept="image/*" capture="environment">
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Phase3: GAS WebアプリのデプロイURL（デプロイ後にここへ貼り付ける）
+  var GAS_URL = "https://script.google.com/macros/s/AKfycbwIRB4Irobx-Q_EDHHp_pBXQFeHPccXpuj1wI73-_JRUYjVki7_IHvrRnosK8NpBwbk/exec";
+
+  // マス配置（固定）
+  var THEMES = [
+    { emoji:"☁️", label:"そら" },
+    { emoji:"🟤", label:"つち" },
+    { emoji:"🏫", label:"がっこう" },
+    { emoji:"🏃", label:"ぐらうんど" },
+    { emoji:"🚗", label:"くるま" },
+    { emoji:"🧑‍🏫", label:"せんせい" },
+    { emoji:"🌳", label:"き" },
+    { emoji:"🍃", label:"はっぱ" },
+    { emoji:"🐛", label:"むし" }
+  ];
+
+  var LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  // TODO(Phase3): uploaded:false のレコードをGAS経由でサーバーへアップロードする
+  var photos = new Array(9).fill(null); // dataURL を格納
+  var pendingIndex = null;
+  var bingoAchieved = false;
+  var sessionId = generateUUID();
+
+  // ---------- IndexedDB永続化 ----------
+  var DB_NAME = "bingoDB";
+  var DB_VERSION = 1;
+  var STORE_NAME = "shots";
+  var dbPromise = null;
+
+  function generateUUID(){
+    if (window.crypto && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c){
+      var r = Math.random() * 16 | 0;
+      var v = c === "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function openDB(){
+    if (!window.indexedDB) return Promise.reject(new Error("IndexedDB未対応"));
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject){
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          // テーマ名をキーにして、1マスにつき最新の1枚だけを保持する
+          db.createObjectStore(STORE_NAME, { keyPath: "theme" });
+        }
+      };
+      req.onsuccess = function(e){ resolve(e.target.result); };
+      req.onerror = function(e){ reject(e.target.error); };
+    });
+    return dbPromise;
+  }
+
+  function saveShot(record){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(record);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function loadAllShots(){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readonly");
+        var req = tx.objectStore(STORE_NAME).getAll();
+        req.onsuccess = function(){ resolve(req.result || []); };
+        req.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function clearAllShots(){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  function getPendingShots(){
+    return loadAllShots().then(function(records){
+      return records.filter(function(record){ return !record.uploaded; });
+    });
+  }
+
+  function markUploaded(theme, fileUrl){
+    return openDB().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        var store = tx.objectStore(STORE_NAME);
+        var getReq = store.get(theme);
+        getReq.onsuccess = function(){
+          var record = getReq.result;
+          if (record) {
+            record.uploaded = true;
+            if (fileUrl) record.fileUrl = fileUrl;
+            store.put(record);
+          }
+        };
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(e){ reject(e.target.error); };
+      });
+    });
+  }
+
+  var titleScreen = document.getElementById("title-screen");
+  var bingoScreen = document.getElementById("bingo-screen");
+  var grid = document.getElementById("grid");
+  var cameraInput = document.getElementById("camera-input");
+  var photoModal = document.getElementById("photo-modal");
+  var modalImage = document.getElementById("modal-image");
+  var modalCaption = document.getElementById("modal-caption");
+  var celebration = document.getElementById("celebration");
+  var uploadOverlay = document.getElementById("upload-overlay");
+  var uploadYesButton = document.getElementById("upload-yes");
+  var uploadNoButton = document.getElementById("upload-no");
+  var uploadCloseButton = document.getElementById("upload-close");
+  var uploadProgressText = document.getElementById("upload-progress-text");
+
+  function buildGrid(){
+    grid.innerHTML = "";
+    THEMES.forEach(function(theme, index){
+      var cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.index = index;
+
+      var inner = document.createElement("div");
+      inner.className = "cell-inner";
+
+      var front = document.createElement("div");
+      front.className = "cell-face cell-front";
+      front.innerHTML =
+        '<div class="cell-emoji">' + theme.emoji + '</div>' +
+        '<div class="cell-label">' + theme.label + '</div>';
+
+      var back = document.createElement("div");
+      back.className = "cell-face cell-back";
+      back.innerHTML = "📷<br>カメラをおこすよ";
+
+      inner.appendChild(front);
+      inner.appendChild(back);
+      cell.appendChild(inner);
+      grid.appendChild(cell);
+
+      cell.addEventListener("click", function(){ onCellTap(index); });
+    });
+  }
+
+  function getCellParts(index){
+    var cell = grid.querySelector('.cell[data-index="' + index + '"]');
+    return {
+      cell: cell,
+      inner: cell.querySelector(".cell-inner"),
+      front: cell.querySelector(".cell-front")
+    };
+  }
+
+  function onCellTap(index){
+    if (bingoAchieved) return;
+
+    if (photos[index]) {
+      openModal(index);
+      return;
+    }
+
+    var parts = getCellParts(index);
+    pendingIndex = index;
+    parts.inner.classList.add("flipped");
+
+    var handled = false;
+    function onFlipEnd(e){
+      if (e.propertyName !== "transform" || handled) return;
+      handled = true;
+      parts.inner.removeEventListener("transitionend", onFlipEnd);
+      openCamera(index);
+    }
+    parts.inner.addEventListener("transitionend", onFlipEnd);
+  }
+
+  function openCamera(index){
+    pendingIndex = index;
+    cameraInput.value = "";
+    cameraInput.click();
+
+    // キャンセル時（changeイベントが発火しない端末）を考慮して
+    // window復帰後に選択有無を確認し、未選択ならパネルを戻す
+    var checkIndex = index;
+    window.addEventListener("focus", function onFocus(){
+      window.removeEventListener("focus", onFocus);
+      setTimeout(function(){
+        if (!cameraInput.files || cameraInput.files.length === 0) {
+          revertFlip(checkIndex);
+        }
+      }, 400);
+    });
+  }
+
+  function revertFlip(index){
+    var parts = getCellParts(index);
+    parts.inner.classList.remove("flipped");
+  }
+
+  cameraInput.addEventListener("change", function(){
+    if (pendingIndex === null) return;
+    var file = cameraInput.files && cameraInput.files[0];
+    var index = pendingIndex;
+    pendingIndex = null;
+
+    if (!file) {
+      revertFlip(index);
+      return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var dataUrl = e.target.result;
+      photos[index] = dataUrl;
+      fillCell(index, dataUrl);
+      revertFlip(index);
+      checkBingo();
+
+      saveShot({
+        sessionId: sessionId,
+        theme: THEMES[index].label,
+        imageDataUrl: dataUrl,
+        capturedAt: new Date().toISOString(),
+        uploaded: false
+      }).catch(function(err){
+        console.warn("IndexedDBへの保存に失敗しました", err);
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function fillCell(index, dataUrl){
+    var parts = getCellParts(index);
+    var theme = THEMES[index];
+    parts.front.classList.add("filled");
+    parts.front.innerHTML =
+      '<div class="cell-thumb-wrap">' +
+        '<img src="' + dataUrl + '" alt="' + theme.label + '">' +
+        '<div class="cell-thumb-label">' + theme.label + '</div>' +
+      '</div>';
+  }
+
+  function openModal(index){
+    var theme = THEMES[index];
+    modalImage.src = photos[index];
+    modalCaption.textContent = theme.label;
+    photoModal.classList.add("show");
+  }
+
+  function closeModal(){
+    photoModal.classList.remove("show");
+  }
+
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+  photoModal.addEventListener("click", function(e){
+    if (e.target === photoModal) closeModal();
+  });
+
+  function checkBingo(){
+    var hit = LINES.some(function(line){
+      return line.every(function(i){ return !!photos[i]; });
+    });
+    if (hit) {
+      bingoAchieved = true;
+      showCelebration();
+    }
+  }
+
+  function showCelebration(){
+    spawnConfetti();
+    celebration.classList.add("show");
+  }
+
+  function spawnConfetti(){
+    var colors = ["#ff8fab", "#ffd166", "#6ec6ff", "#8ee686", "#c8a2ff"];
+    var count = 60;
+    var existing = celebration.querySelectorAll(".confetti");
+    existing.forEach(function(el){ el.remove(); });
+
+    for (var i = 0; i < count; i++) {
+      var piece = document.createElement("div");
+      piece.className = "confetti";
+      piece.style.left = (Math.random() * 100) + "vw";
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDuration = (2 + Math.random() * 2) + "s";
+      piece.style.animationDelay = (Math.random() * 1.5) + "s";
+      piece.style.borderRadius = (Math.random() < 0.5) ? "50%" : "2px";
+      celebration.appendChild(piece);
+    }
+  }
+
+  function resetBingo(){
+    photos = new Array(9).fill(null);
+    pendingIndex = null;
+    bingoAchieved = false;
+    celebration.classList.remove("show");
+    buildGrid();
+
+    clearAllShots().catch(function(err){
+      console.warn("IndexedDBの削除に失敗しました", err);
+    });
+  }
+
+  function restoreFromDB(){
+    loadAllShots().then(function(records){
+      records.forEach(function(record){
+        var index = THEMES.findIndex(function(theme){ return theme.label === record.theme; });
+        if (index === -1) return;
+        photos[index] = record.imageDataUrl;
+        fillCell(index, record.imageDataUrl);
+      });
+      checkBingo();
+    }).catch(function(err){
+      console.warn("IndexedDBからの復元に失敗しました", err);
+    });
+  }
+
+  // ---------- Phase3: GASアップロード ----------
+  var isUploading = false;
+  var uploadDialogOpen = false;
+
+  function setUploadView(name){
+    ["confirm", "sending", "done"].forEach(function(key){
+      document.getElementById("upload-view-" + key).classList.toggle("hidden", key !== name);
+    });
+  }
+
+  function showUploadConfirm(){
+    uploadYesButton.disabled = false;
+    uploadNoButton.disabled = false;
+    setUploadView("confirm");
+    uploadOverlay.classList.add("show");
+    uploadDialogOpen = true;
+  }
+
+  function hideUploadOverlay(){
+    uploadOverlay.classList.remove("show");
+    uploadDialogOpen = false;
+  }
+
+  function checkPendingAndPrompt(){
+    if (!GAS_URL) return; // GASデプロイURL未設定なら何もしない
+    if (isUploading || uploadDialogOpen) return;
+    getPendingShots().then(function(pending){
+      if (pending.length === 0) return;
+      showUploadConfirm();
+    }).catch(function(err){
+      console.warn("アップロード対象の確認に失敗しました", err);
+    });
+  }
+
+  function uploadShot(record){
+    return fetch(GAS_URL, {
+      method: "POST",
+      // "application/json" にするとプリフライト(OPTIONS)が発生しGASが応答できないため、
+      // プリフライト不要な "text/plain" で送信する（GAS側はcontentsをJSONとしてparseする）
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        sessionId: record.sessionId,
+        theme: record.theme,
+        imageDataUrl: record.imageDataUrl,
+        capturedAt: record.capturedAt
+      })
+    }).then(function(res){ return res.json(); });
+  }
+
+  function startUpload(){
+    isUploading = true;
+    uploadYesButton.disabled = true;
+    uploadNoButton.disabled = true;
+    setUploadView("sending");
+
+    getPendingShots().then(function(pending){
+      var total = pending.length;
+
+      function uploadNext(i){
+        if (i >= pending.length) {
+          isUploading = false;
+          setUploadView("done");
+          return;
+        }
+        var record = pending[i];
+        uploadProgressText.textContent = "おくっているよ…(" + (i + 1) + "/" + total + ")";
+
+        uploadShot(record).then(function(result){
+          if (result && result.result === "success") {
+            return markUploaded(record.theme, result.fileUrl);
+          }
+          console.warn("アップロードに失敗しました", result);
+        }).catch(function(err){
+          console.warn("アップロード通信に失敗しました", err);
+        }).then(function(){
+          uploadNext(i + 1);
+        });
+      }
+
+      uploadNext(0);
+    }).catch(function(err){
+      console.warn("アップロード対象の取得に失敗しました", err);
+      isUploading = false;
+      hideUploadOverlay();
+    });
+  }
+
+  uploadYesButton.addEventListener("click", startUpload);
+  uploadNoButton.addEventListener("click", hideUploadOverlay);
+  uploadCloseButton.addEventListener("click", hideUploadOverlay);
+
+  window.addEventListener("online", checkPendingAndPrompt);
+
+  document.getElementById("start-button").addEventListener("click", function(){
+    titleScreen.classList.add("hidden");
+    bingoScreen.classList.remove("hidden");
+  });
+
+  document.getElementById("back-title-button").addEventListener("click", function(){
+    bingoScreen.classList.add("hidden");
+    titleScreen.classList.remove("hidden");
+  });
+
+  document.getElementById("reset-button").addEventListener("click", resetBingo);
+  document.getElementById("celebration-reset").addEventListener("click", resetBingo);
+
+  buildGrid();
+  restoreFromDB();
+
+  // ---------- Service Worker登録（PWAオフライン対応） ----------
+  // 注意：file:// で直接開いた場合はセキュアコンテキストでないため登録に失敗する。
+  // ローカルサーバー経由 or https配信で有効になる。
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("./sw.js").then(function(reg){
+        console.log("Service Worker登録完了:", reg.scope);
+      }).catch(function(err){
+        console.warn("Service Workerの登録に失敗しました", err);
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
